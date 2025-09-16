@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Serial Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <nav>
+    <div class="logo">
+      <img src="logo.png" alt="Logo">
+    </div>
+    <ul class="nav-links">
+      <li><button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-moon"></i></button></li>
+    </ul>
+  </nav>
+
+  <div class="main-container">
+    <div class="left-panel">
+      <section class="control-section" id="protocol-section">
+        <h3><i class="fas fa-exchange-alt"></i> Protocol Selection</h3>
+        <div class="controls">
+          <select id="protocol-select" onchange="updateProtocolUI()" class="input-field">
+            <option value="FTP">FTP</option>
+            <option value="MQTT">MQTT</option>
+            <option value="HTTP">HTTP</option>
+          </select>
+          <button onclick="setProtocol()" class="action-button"><i class="fas fa-save"></i> Set Protocol</button>
+        </div>
+      </section>
+
+      <section class="control-section" id="ftp-section">
+        <h3><i class="fas fa-cloud-upload-alt"></i> FTP Configuration</h3>
+        <div class="controls">
+          <input type="text" id="ftp-host" placeholder="Host (e.g., 13.126.194.224)" class="input-field">
+          <button onclick="setFTPHost()" class="action-button"><i class="fas fa-link"></i> Set Host</button>
+        </div>
+        <div class="controls">
+          <input type="text" id="ftp-user" placeholder="User (e.g., iit_ropar)" class="input-field">
+          <button onclick="setFTPUser()" class="action-button"><i class="fas fa-user"></i> Set User</button>
+        </div>
+        <div class="controls">
+          <input type="password" id="ftp-password" placeholder="Password" class="input-field">
+          <button onclick="setFTPPassword()" class="action-button"><i class="fas fa-key"></i> Set Password</button>
+        </div>
+        <div class="controls">
+          <button onclick="getFTPConfig()" class="action-button full-width"><i class="fas fa-eye"></i> Get FTP Config</button>
+        </div>
+        <div class="controls">
+          <input type="text" id="upload-filename" placeholder="Filename (e.g., data1.json)" class="input-field">
+          <button onclick="uploadFile()" class="action-button full-width"><i class="fas fa-file-upload"></i> Upload File (FTP only)</button>
+        </div>
+      </section>
+
+      <section class="control-section" id="mqtt-section" style="display: none;">
+        <h3><i class="fas fa-comments"></i> MQTT Configuration</h3>
+        <div class="controls">
+          <input type="text" id="mqtt-broker" placeholder="Broker (e.g., broker.hivemq.com)" class="input-field">
+          <button onclick="setMQTTBroker()" class="action-button"><i class="fas fa-link"></i> Set Broker</button>
+        </div>
+        <div class="controls">
+          <input type="text" id="mqtt-user" placeholder="User" class="input-field">
+          <button onclick="setMQTTUser()" class="action-button"><i class="fas fa-user"></i> Set User</button>
+        </div>
+        <div class="controls">
+          <input type="password" id="mqtt-password" placeholder="Password" class="input-field">
+          <button onclick="setMQTTPassword()" class="action-button"><i class="fas fa-key"></i> Set Password</button>
+        </div>
+        <div class="controls">
+          <button onclick="getMQTTConfig()" class="action-button full-width"><i class="fas fa-eye"></i> Get MQTT Config</button>
+        </div>
+      </section>
+
+      <section class="control-section" id="http-section" style="display: none;">
+        <h3><i class="fas fa-globe"></i> HTTP Configuration</h3>
+        <div class="controls">
+          <input type="text" id="http-url" placeholder="URL (e.g., http://example.com/data)" class="input-field">
+          <button onclick="setHTTPURL()" class="action-button"><i class="fas fa-link"></i> Set URL</button>
+        </div>
+        <div class="controls">
+          <input type="text" id="http-auth-user" placeholder="Auth User" class="input-field">
+          <input type="password" id="http-auth-password" placeholder="Auth Password" class="input-field">
+          <button onclick="setHTTPAuth()" class="action-button"><i class="fas fa-user-shield"></i> Set Auth</button>
+        </div>
+        <div class="controls">
+          <button onclick="getHTTPConfig()" class="action-button full-width"><i class="fas fa-eye"></i> Get HTTP Config</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="right-panel">
+      <div class="container">
+        <h2><i class="fas fa-terminal"></i> Serial Monitor</h2>
+
+        <section class="control-section">
+          <h3><i class="fas fa-plug"></i> Serial Port</h3>
+          <div class="controls">
+            <button onclick="listPorts()" class="action-button"><i class="fas fa-list"></i> List Ports</button>
+            <select id="ports" class="input-field"></select>
+            <button onclick="connectPort()" class="action-button"><i class="fas fa-play"></i> Connect</button>
+            <button onclick="disconnectPort()" class="action-button"><i class="fas fa-stop"></i> Disconnect</button>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <h3><i class="fas fa-clock"></i> Interval Configuration</h3>
+          <div class="controls">
+            <input type="number" id="interval" placeholder="Interval (seconds)" min="1" class="input-field">
+            <button onclick="setInterval()" class="action-button"><i class="fas fa-save"></i> Set Interval</button>
+            <button onclick="getInterval()" class="action-button"><i class="fas fa-eye"></i> Get Interval</button>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <h3><i class="fas fa-lightbulb"></i> LED Controls</h3>
+          <div class="controls">
+            <button id="led-on" onclick="sendCommand('LED_ON')" class="action-button"><i class="fas fa-toggle-on"></i> LED ON</button>
+            <button id="led-off" onclick="sendCommand('LED_OFF')" class="action-button"><i class="fas fa-toggle-off"></i> LED OFF</button>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <h3><i class="fas fa-file-alt"></i> UART Logs</h3>
+          <div id="output"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p><i class="fas fa-copyright"></i> Serial Monitor App © 2025</p>
+  </footer>
+
+  <script src="renderer.js"></script>
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('dark-mode');
+      localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+      const icon = document.querySelector('.theme-toggle i');
+      icon.className = document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon';
+    }
+
+    // Load saved theme
+    if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.querySelector('.theme-toggle i').className = 'fas fa-sun';
+    }
+  </script>
+</body>
+</html>
