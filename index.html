@@ -5,13 +5,15 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<body>
+<body class="light-mode">
   <nav>
     <div class="logo">
       <img src="logo.png" alt="Logo">
     </div>
     <ul class="nav-links">
-      <li><button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-moon"></i></button></li>
+      <li>
+        <button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
+      </li>
     </ul>
   </nav>
 
@@ -36,6 +38,10 @@
           <button onclick="setFTPHost()" class="action-button"><i class="fas fa-link"></i> Set Host</button>
         </div>
         <div class="controls">
+          <input type="number" id="ftp-port" placeholder="Port (default 21, or 22 for SFTP/FTPS)" value="21" min="1" class="input-field">
+          <button onclick="setFTPPort()" class="action-button"><i class="fas fa-link"></i> Set Port</button>
+        </div>
+        <div class="controls">
           <input type="text" id="ftp-user" placeholder="User (e.g., iit_ropar)" class="input-field">
           <button onclick="setFTPUser()" class="action-button"><i class="fas fa-user"></i> Set User</button>
         </div>
@@ -44,19 +50,24 @@
           <button onclick="setFTPPassword()" class="action-button"><i class="fas fa-key"></i> Set Password</button>
         </div>
         <div class="controls">
+          <button onclick="setFTPConfig()" class="action-button full-width"><i class="fas fa-save"></i> Set Config</button>
           <button onclick="getFTPConfig()" class="action-button full-width"><i class="fas fa-eye"></i> Get FTP Config</button>
         </div>
         <div class="controls">
           <input type="text" id="upload-filename" placeholder="Filename (e.g., data1.json)" class="input-field">
-          <button onclick="uploadFile()" class="action-button full-width"><i class="fas fa-file-upload"></i> Upload File (FTP only)</button>
+          <button onclick="uploadFile()" class="action-button full-width"><i class="fas fa-file-upload"></i> Upload File</button>
         </div>
       </section>
 
       <section class="control-section" id="mqtt-section" style="display: none;">
         <h3><i class="fas fa-comments"></i> MQTT Configuration</h3>
         <div class="controls">
-          <input type="text" id="mqtt-broker" placeholder="Broker (e.g., broker.hivemq.com)" class="input-field">
+          <input type="text" id="mqtt-broker" placeholder="Broker (e.g., a3qvnhplljfvjr-ats.iot.us-east-1.amazonaws.com)" class="input-field">
           <button onclick="setMQTTBroker()" class="action-button"><i class="fas fa-link"></i> Set Broker</button>
+        </div>
+        <div class="controls">
+          <input type="number" id="mqtt-port" placeholder="Port (default 1883, or 8883 for TLS)" value="1883" min="1" class="input-field">
+          <button onclick="setMQTTPort()" class="action-button"><i class="fas fa-link"></i> Set Port</button>
         </div>
         <div class="controls">
           <input type="text" id="mqtt-user" placeholder="User" class="input-field">
@@ -67,6 +78,27 @@
           <button onclick="setMQTTPassword()" class="action-button"><i class="fas fa-key"></i> Set Password</button>
         </div>
         <div class="controls">
+          <label for="mqtt-ssl" class="input-label">SSL/TLS Enabled:</label>
+          <select id="mqtt-ssl" onchange="toggleCertUploadAndPort()" class="input-field">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+          <button onclick="setMQTTConfig()" class="action-button"><i class="fas fa-save"></i> Set Config</button>
+        </div>
+        <div id="cert-section" style="display: none;">
+          <div class="controls">
+            <label class="input-label">Device Certificate:</label>
+            <input type="text" id="mqtt-ca-cert-path" placeholder="Path to certificate" readonly class="input-field">
+            <button onclick="browseCACert()" class="action-button"><i class="fas fa-folder-open"></i> Browse</button>
+          </div>
+          <div class="controls">
+            <label class="input-label">Private Key:</label>
+            <input type="text" id="mqtt-client-key-path" placeholder="Path to private key" readonly class="input-field">
+            <button onclick="browseClientKey()" class="action-button"><i class="fas fa-folder-open"></i> Browse</button>
+          </div>
+        </div>
+        <div class="controls">
+          <button onclick="uploadCertificates()" class="action-button full-width" id="cert-upload-button" style="display: none;"><i class="fas fa-upload"></i> Upload Certificates</button>
           <button onclick="getMQTTConfig()" class="action-button full-width"><i class="fas fa-eye"></i> Get MQTT Config</button>
         </div>
       </section>
@@ -83,7 +115,31 @@
           <button onclick="setHTTPAuth()" class="action-button"><i class="fas fa-user-shield"></i> Set Auth</button>
         </div>
         <div class="controls">
+          <button onclick="setHTTPConfig()" class="action-button full-width"><i class="fas fa-save"></i> Set Config</button>
           <button onclick="getHTTPConfig()" class="action-button full-width"><i class="fas fa-eye"></i> Get HTTP Config</button>
+        </div>
+      </section>
+
+      <section class="control-section" id="sensors-section">
+        <h3><i class="fas fa-microchip"></i> Sensors</h3>
+        <div class="controls">
+          <select id="sensor-select" class="input-field">
+            <option value="RS232">RS232</option>
+            <option value="I2C">I2C</option>
+            <option value="SPI">SPI</option>
+            <option value="RS485">RS485</option>
+          </select>
+          <button onclick="setSensorType()" class="action-button"><i class="fas fa-save"></i> Set Sensor</button>
+        </div>
+        <div class="controls">
+          <select id="sensor-format" class="input-field">
+            <option value="plain">Plain Text</option>
+            <option value="hex">Hex</option>
+          </select>
+          <button onclick="setSensorFormat()" class="action-button"><i class="fas fa-save"></i> Set Format</button>
+        </div>
+        <div class="controls">
+          <button onclick="getSensorConfig()" class="action-button full-width"><i class="fas fa-eye"></i> Get Config</button>
         </div>
       </section>
     </div>
@@ -97,6 +153,14 @@
           <div class="controls">
             <button onclick="listPorts()" class="action-button"><i class="fas fa-list"></i> List Ports</button>
             <select id="ports" class="input-field"></select>
+            <select id="baud-rate" class="input-field">
+              <option value="9600">9600</option>
+              <option value="19200">19200</option>
+              <option value="38400">38400</option>
+              <option value="57600">57600</option>
+              <option value="115200" selected>115200</option>
+              <option value="230400">230400</option>
+            </select>
             <button onclick="connectPort()" class="action-button"><i class="fas fa-play"></i> Connect</button>
             <button onclick="disconnectPort()" class="action-button"><i class="fas fa-stop"></i> Disconnect</button>
           </div>
@@ -114,13 +178,16 @@
         <section class="control-section">
           <h3><i class="fas fa-lightbulb"></i> LED Controls</h3>
           <div class="controls">
-            <button id="led-on" onclick="sendCommand('LED_ON')" class="action-button"><i class="fas fa-toggle-on"></i> LED ON</button>
-            <button id="led-off" onclick="sendCommand('LED_OFF')" class="action-button"><i class="fas fa-toggle-off"></i> LED OFF</button>
+            <button id="led-toggle-button" onclick="toggleLED()" class="action-button"><i class="fas fa-toggle-off"></i> Turn LED On</button>
+            <button id="restart-button" onclick="restartDevice()" class="action-button"><i class="fas fa-redo"></i> Restart Device</button>
           </div>
         </section>
 
         <section class="control-section">
           <h3><i class="fas fa-file-alt"></i> UART Logs</h3>
+          <div class="controls">
+            <button onclick="clearOutput()" class="action-button full-width"><i class="fas fa-trash"></i> Clear Logs</button>
+          </div>
           <div id="output"></div>
         </section>
       </div>
@@ -134,6 +201,7 @@
   <script src="renderer.js"></script>
   <script>
     function toggleTheme() {
+      document.body.classList.toggle('light-mode');
       document.body.classList.toggle('dark-mode');
       localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
       const icon = document.querySelector('.theme-toggle i');
@@ -142,6 +210,7 @@
 
     // Load saved theme
     if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.remove('light-mode');
       document.body.classList.add('dark-mode');
       document.querySelector('.theme-toggle i').className = 'fas fa-sun';
     }
