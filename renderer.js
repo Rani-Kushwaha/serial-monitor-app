@@ -1,11 +1,15 @@
+<<<<<<< HEAD
 let selectedCACertFile = null;
 let selectedClientKeyFile = null;
 
+=======
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 function updateProtocolUI() {
   const protocol = document.getElementById("protocol-select").value;
   document.getElementById("ftp-section").style.display = protocol === "FTP" ? "block" : "none";
   document.getElementById("mqtt-section").style.display = protocol === "MQTT" ? "block" : "none";
   document.getElementById("http-section").style.display = protocol === "HTTP" ? "block" : "none";
+<<<<<<< HEAD
   if (protocol === "MQTT") {
     toggleCertUploadAndPort();
   } else {
@@ -76,6 +80,13 @@ async function uploadCertificates() {
     document.getElementById("output").innerHTML += result + "<br>";
   }
 }
+=======
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  updateProtocolUI();
+});
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 
 async function listPorts() {
   const result = await window.electronAPI.listPorts();
@@ -95,16 +106,23 @@ async function listPorts() {
 
 async function connectPort() {
   const portName = document.getElementById("ports").value;
+<<<<<<< HEAD
   const baudRate = document.getElementById("baud-rate").value;
+=======
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
   if (!portName) {
     document.getElementById("output").innerHTML += "Please select a port.<br>";
     return;
   }
+<<<<<<< HEAD
   if (!baudRate || isNaN(baudRate) || baudRate <= 0) {
     document.getElementById("output").innerHTML += "Please select a valid baud rate.<br>";
     return;
   }
   const result = await window.electronAPI.connectPort(portName, baudRate);
+=======
+  const result = await window.electronAPI.connectPort(portName);
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
   if (result.error) {
     document.getElementById("output").innerHTML += result.error + "<br>";
     return;
@@ -122,19 +140,45 @@ async function disconnectPort() {
 }
 
 async function sendCommand(cmd) {
+<<<<<<< HEAD
   if (!cmd) return;
+=======
+  if (cmd !== "LED_ON" && cmd !== "LED_OFF") {
+    document.getElementById("output").innerHTML += "Invalid command!<br>";
+    return;
+  }
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
   const result = await window.electronAPI.sendData(cmd);
   if (result.error) {
     document.getElementById("output").innerHTML += result.error + "<br>";
     return;
   }
   document.getElementById("output").innerHTML += result + "<br>";
+<<<<<<< HEAD
+=======
+
+  // Toggle buttons
+  const onBtn = document.getElementById("led-on");
+  const offBtn = document.getElementById("led-off");
+  if (cmd === "LED_ON") {
+    onBtn.disabled = true;
+    offBtn.disabled = false;
+  } else {
+    onBtn.disabled = false;
+    offBtn.disabled = true;
+  }
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 }
 
 async function setInterval() {
   const interval = document.getElementById("interval").value;
   if (!interval || isNaN(interval) || interval <= 0) {
+<<<<<<< HEAD
     document.getElementById("output").innerHTML += "Please enter a valid interval (positive seconds).<br>";
+=======
+    document.getElementById("output").innerHTML +=
+      "Please enter a valid interval (positive seconds).<br>";
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
     return;
   }
   const result = await window.electronAPI.setInterval(interval);
@@ -143,17 +187,45 @@ async function setInterval() {
     return;
   }
   document.getElementById("output").innerHTML += result + "<br>";
+<<<<<<< HEAD
+=======
+
+  // Listen for serial response
+  window.electronAPI.onSerialData((data) => {
+    if (data.includes("Interval set to")) {
+      document.getElementById("output").innerHTML += data + "<br>";
+    } else if (data.includes("Invalid interval value")) {
+      document.getElementById("output").innerHTML += "Error: " + data + "<br>";
+    }
+  });
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 }
 
 async function getInterval() {
   const result = await window.electronAPI.getInterval();
   if (result.error) {
     document.getElementById("output").innerHTML += result.error + "<br>";
+<<<<<<< HEAD
   } else {
     document.getElementById("output").innerHTML += result + "<br>";
   }
 }
 
+=======
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+
+  window.electronAPI.onSerialData((data) => {
+    if (data.includes("Current interval:")) {
+      const seconds = parseInt(data.split(":")[1].trim().split("s")[0]);
+      document.getElementById("output").innerHTML += `Interval: ${seconds} seconds<br>`;
+    }
+  });
+}
+
+// --- Protocol, FTP, MQTT, HTTP functions ---
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 async function setProtocol() {
   const protocol = document.getElementById("protocol-select").value;
   const result = await window.electronAPI.setProtocol(protocol);
@@ -162,6 +234,7 @@ async function setProtocol() {
     return;
   }
   document.getElementById("output").innerHTML += result + "<br>";
+<<<<<<< HEAD
   updateProtocolUI();
 }
 
@@ -190,12 +263,58 @@ async function setFTPConfig() {
       document.getElementById("output").innerHTML += result + "<br>";
     }
   }
+=======
+  updateProtocolUI(); // Update UI after setting
+}
+
+async function setFTPHost() {
+  const host = document.getElementById("ftp-host").value;
+  if (!host) {
+    document.getElementById("output").innerHTML += "Please enter FTP host.<br>";
+    return;
+  }
+  const result = await window.electronAPI.setFTPHost(host);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+}
+
+async function setFTPUser() {
+  const user = document.getElementById("ftp-user").value;
+  if (!user) {
+    document.getElementById("output").innerHTML += "Please enter FTP user.<br>";
+    return;
+  }
+  const result = await window.electronAPI.setFTPUser(user);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+}
+
+async function setFTPPassword() {
+  const password = document.getElementById("ftp-password").value;
+  if (!password) {
+    document.getElementById("output").innerHTML += "Please enter FTP password.<br>";
+    return;
+  }
+  const result = await window.electronAPI.setFTPPassword(password);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 }
 
 async function getFTPConfig() {
   const result = await window.electronAPI.getFTPConfig();
   if (result.error) {
     document.getElementById("output").innerHTML += result.error + "<br>";
+<<<<<<< HEAD
   } else {
     document.getElementById("output").innerHTML += result + "<br>";
   }
@@ -230,12 +349,68 @@ async function setMQTTConfig() {
     await delay(200); // Wait 200ms
   }
   document.getElementById("output").innerHTML += "MQTT config sent.<br>";
+=======
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+  window.electronAPI.onSerialData((data) => {
+    if (
+      data.includes("FTP protocol is running") ||
+      data.includes("FTP connection")
+    ) {
+      document.getElementById("output").innerHTML += data + "<br>";
+    }
+  });
+}
+
+async function setMQTTBroker() {
+  const broker = document.getElementById("mqtt-broker").value;
+  if (!broker) {
+    document.getElementById("output").innerHTML += "Please enter MQTT broker.<br>";
+    return;
+  }
+  const result = await window.electronAPI.setMQTTBroker(broker);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+}
+
+async function setMQTTUser() {
+  const user = document.getElementById("mqtt-user").value;
+  if (!user) {
+    document.getElementById("output").innerHTML += "Please enter MQTT user.<br>";
+    return;
+  }
+  const result = await window.electronAPI.setMQTTUser(user);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+}
+
+async function setMQTTPassword() {
+  const password = document.getElementById("mqtt-password").value;
+  if (!password) {
+    document.getElementById("output").innerHTML += "Please enter MQTT password.<br>";
+    return;
+  }
+  const result = await window.electronAPI.setMQTTPassword(password);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 }
 
 async function getMQTTConfig() {
   const result = await window.electronAPI.getMQTTConfig();
   if (result.error) {
     document.getElementById("output").innerHTML += result.error + "<br>";
+<<<<<<< HEAD
   } else {
     document.getElementById("output").innerHTML += result + "<br>";
   }
@@ -263,12 +438,58 @@ async function setHTTPConfig() {
       document.getElementById("output").innerHTML += result + "<br>";
     }
   }
+=======
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+  window.electronAPI.onSerialData((data) => {
+    if (
+      data.includes("MQTT protocol is running") ||
+      data.includes("MQTT connection")
+    ) {
+      document.getElementById("output").innerHTML += data + "<br>";
+    }
+  });
+}
+
+// --- HTTP functions ---
+async function setHTTPURL() {
+  const url = document.getElementById("http-url").value;
+  if (!url) {
+    document.getElementById("output").innerHTML += "Please enter HTTP URL.<br>";
+    return;
+  }
+  const result = await window.electronAPI.setHTTPURL(url);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+}
+
+async function setHTTPAuth() {
+  const user = document.getElementById("http-auth-user").value;
+  const password = document.getElementById("http-auth-password").value;
+  if (!user || !password) {
+    document.getElementById("output").innerHTML +=
+      "Please enter HTTP auth user and password.<br>";
+    return;
+  }
+  const auth = `${user}:${password}`;
+  const result = await window.electronAPI.setHTTPAuth(auth);
+  if (result.error) {
+    document.getElementById("output").innerHTML += result.error + "<br>";
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 }
 
 async function getHTTPConfig() {
   const result = await window.electronAPI.getHTTPConfig();
   if (result.error) {
     document.getElementById("output").innerHTML += result.error + "<br>";
+<<<<<<< HEAD
   } else {
     document.getElementById("output").innerHTML += result + "<br>";
   }
@@ -303,6 +524,22 @@ async function getSensorConfig() {
   }
 }
 
+=======
+    return;
+  }
+  document.getElementById("output").innerHTML += result + "<br>";
+  window.electronAPI.onSerialData((data) => {
+    if (
+      data.includes("HTTP protocol is running") ||
+      data.includes("HTTP connection")
+    ) {
+      document.getElementById("output").innerHTML += data + "<br>";
+    }
+  });
+}
+
+// --- File Upload ---
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 async function uploadFile() {
   const filename = document.getElementById("upload-filename").value;
   if (!filename) {
@@ -323,6 +560,7 @@ async function exitApp() {
   setTimeout(() => window.close(), 500);
 }
 
+<<<<<<< HEAD
 window.electronAPI.onSerialData((data) => {
   if (data) {
     const sanitizedData = data.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -355,4 +593,11 @@ window.electronAPI.onSerialData((data) => {
 window.addEventListener('DOMContentLoaded', () => {
   updateProtocolUI();
   listPorts();
+=======
+// --- Global listener for incoming serial data ---
+window.electronAPI.onSerialData((data) => {
+  if (data) {
+    document.getElementById("output").innerHTML += "Received: " + data + "<br>";
+  }
+>>>>>>> 25a00f69ef664f70abfda3cd8ca54dfac9077c34
 });
