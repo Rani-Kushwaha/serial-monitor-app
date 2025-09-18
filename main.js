@@ -2,22 +2,29 @@ const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const { SerialPort } = require("serialport");
 const fs = require("fs").promises;
+const dns = require("dns").promises;
 
 let mainWindow;
 let port;
 let responseBuffer = "";
 
+/**
+ * Send a simple command to the firmware.
+ */
 async function sendCommand(message) {
   if (!port || !port.isOpen) {
     return { error: "Port not open!" };
   }
+
   try {
     const command = message + "\r\n";
     console.log(`Sending command: ${JSON.stringify(command)}`);
     mainWindow.webContents.send("serial-data", `> ${message}`);
+
     await new Promise((resolve, reject) => {
       port.write(command, (err) => (err ? reject(err) : resolve()));
     });
+
     return `Successfully sent: ${message}`;
   } catch (error) {
     console.error(`Failed to send command "${message}":`, error);
@@ -25,6 +32,9 @@ async function sendCommand(message) {
   }
 }
 
+/**
+ * Upload a file to the device.
+ */
 async function sendFile(filePath, fileName) {
   if (!port || !port.isOpen) {
     return { error: "Port not open!" };
@@ -32,38 +42,45 @@ async function sendFile(filePath, fileName) {
 
   try {
     const fileContent = await fs.readFile(filePath);
-    const command = `UPLOAD:${fileName}\r\n`;
+    const command = `UPLOAD_FILE:${fileName}\r\n`;
+    const destPath = `/usr/${fileName}`;
 
+    // Flush UART buffer
     while (port.readable && port.readableLength > 0) {
       port.read();
     }
-    console.log("Flushed UART buffer before sending UPLOAD");
+    console.log("Flushed UART buffer before sending UPLOAD_FILE");
 
+    // Send the upload command
     console.log(`Sending upload command for: ${fileName} (${fileContent.length} bytes)`);
-    mainWindow.webContents.send("serial-data", `> UPLOAD:${fileName}`);
+    mainWindow.webContents.send("serial-data", `> UPLOAD_FILE:${fileName}`);
     await new Promise((resolve, reject) => {
       port.write(command, (err) => (err ? reject(err) : resolve()));
     });
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Wait before sending file data
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
+    // Send the entire file content
     await new Promise((resolve, reject) => {
       port.write(fileContent, (err) => (err ? reject(err) : resolve()));
     });
     console.log(`Sent ${fileContent.length} bytes for ${fileName}`);
 
+    // Send the end-of-file marker
     await new Promise((resolve, reject) => {
       port.write("END_FILE\r\n", (err) => (err ? reject(err) : resolve()));
     });
     console.log(`Sent END_FILE for ${fileName}`);
-    mainWindow.webContents.send("serial-data", `> END_FILE`);
+    mainWindow.webContents.send("serial-data", "> END_FILE");
 
+    // Wait for confirmation
     const confirmation = await new Promise((resolve, reject) => {
       let responseData = "";
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error(`Timeout: No confirmation received for ${fileName}`));
-      }, 60000);
+      }, 30000);
 
       const dataListener = (data) => {
         const text = data.toString("utf8");
@@ -71,10 +88,10 @@ async function sendFile(filePath, fileName) {
         console.log(`Received chunk during confirmation: "${text}"`);
         mainWindow.webContents.send("serial-data", text);
 
-        if (responseData.includes("and saved OK")) {
+        if (responseData.includes(`File ${destPath} received and saved OK`)) {
           cleanup();
           resolve(`Successfully uploaded ${fileName}`);
-        } else if (responseData.includes("Error") || responseData.includes("Invalid protocol")) {
+        } else if (responseData.includes("Error")) {
           cleanup();
           reject(new Error(`Firmware error while receiving ${fileName}: ${responseData.substring(0, 200)}`));
         }
@@ -95,6 +112,9 @@ async function sendFile(filePath, fileName) {
   }
 }
 
+/**
+ * Create Electron window.
+ */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1000,
@@ -103,9 +123,13 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
     },
   });
+
   mainWindow.loadFile("index.html");
 }
 
+/**
+ * App lifecycle.
+ */
 app.on("ready", createWindow);
 
 app.on("window-all-closed", () => {
@@ -117,10 +141,13 @@ app.on("window-all-closed", () => {
   }
 });
 
+/**
+ * IPC handlers.
+ */
 ipcMain.handle("list-ports", async () => {
   try {
     const ports = await SerialPort.list();
-    return ports.map(p => p.path);
+    return ports.map((p) => p.path);
   } catch (error) {
     console.error("List ports error:", error);
     return { error: `Failed to list ports: ${error.message}` };
@@ -130,31 +157,34 @@ ipcMain.handle("list-ports", async () => {
 ipcMain.handle("connect-port", async (event, portName, baudRate = 115200) => {
   try {
     if (port && port.isOpen) {
-      await new Promise(resolve => port.close(resolve));
+      await new Promise((resolve) => port.close(resolve));
     }
     responseBuffer = "";
+
     port = new SerialPort({
       path: portName,
       baudRate: parseInt(baudRate),
       dataBits: 8,
       parity: "none",
       stopBits: 1,
-      autoOpen: false
+      autoOpen: false,
     });
 
     await new Promise((resolve, reject) => {
       port.open((err) => (err ? reject(err) : resolve()));
     });
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     port.on("data", (data) => {
       try {
         const incomingText = data.toString("utf8");
         console.log(`Raw data received: "${incomingText}"`);
+
         responseBuffer += incomingText;
         let lines = responseBuffer.split(/\r?\n/);
         responseBuffer = lines.pop();
+
         for (const line of lines) {
           const message = line.trim();
           if (message) {
@@ -183,7 +213,7 @@ ipcMain.handle("connect-port", async (event, portName, baudRate = 115200) => {
 ipcMain.handle("disconnect-port", async () => {
   try {
     if (port && port.isOpen) {
-      await new Promise(resolve => port.close(resolve));
+      await new Promise((resolve) => port.close(resolve));
       responseBuffer = "";
       return "Disconnected from port.";
     }
@@ -194,52 +224,82 @@ ipcMain.handle("disconnect-port", async () => {
   }
 });
 
+// --- Basic config commands ---
 ipcMain.handle("send-data", (event, message) => sendCommand(message));
+ipcMain.handle("get-interval", () => sendCommand("GET_INTERVAL"));
+ipcMain.handle("get-ftp-config", () => sendCommand("GET_FTP_CONFIG"));
+ipcMain.handle("get-mqtt-config", () => sendCommand("GET_MQTT_CONFIG"));
+ipcMain.handle("get-http-config", () => sendCommand("GET_HTTP_CONFIG"));
+ipcMain.handle("get-tcp-config", () => sendCommand("GET_TCP_CONFIG"));
+ipcMain.handle("get-sensor-config", () => sendCommand("GET_SENSOR_CONFIG"));
+
 ipcMain.handle("set-interval", (event, interval) => {
   const i = parseInt(interval);
   if (isNaN(i) || i <= 0) return { error: "Invalid interval" };
   return sendCommand(`SET_INTERVAL:${i}`);
 });
-ipcMain.handle("get-interval", () => sendCommand("GET_INTERVAL"));
+
 ipcMain.handle("set-protocol", (event, protocol) => {
-  if (!["FTP", "MQTT", "HTTP"].includes(protocol)) return { error: "Invalid protocol" };
+  if (!["FTP", "MQTT", "HTTP"].includes(protocol))
+    return { error: "Invalid protocol" };
   return sendCommand(`SET_PROTOCOL:${protocol}`);
 });
+
+// --- FTP Config ---
 ipcMain.handle("set-ftp-host", (event, host) => sendCommand(`SET_FTP_HOST:${host}`));
-ipcMain.handle("set-ftp-port", (event, port) => sendCommand(`SET_FTP_PORT:${port}`));
 ipcMain.handle("set-ftp-user", (event, user) => sendCommand(`SET_FTP_USER:${user}`));
 ipcMain.handle("set-ftp-password", (event, pass) => sendCommand(`SET_FTP_PASS:${pass}`));
-ipcMain.handle("get-ftp-config", () => sendCommand("GET_FTP_CONFIG"));
-ipcMain.handle("set-mqtt-broker", (event, broker) => sendCommand(`SET_MQTT_BROKER:${broker}`));
-ipcMain.handle("set-mqtt-port", (event, port) => sendCommand(`SET_MQTT_PORT:${port}`));
+ipcMain.handle("set-ftp-port", (event, portNum) => sendCommand(`SET_FTP_PORT:${portNum}`));
+
+// --- MQTT Config ---
+ipcMain.handle("set-mqtt-broker", async (event, broker) => {
+  try {
+    // Resolve broker hostname to IP to bypass DNS issues
+    let resolvedBroker = broker;
+    if (broker.includes("amazonaws.com")) {
+      const { address } = await dns.lookup(broker);
+      resolvedBroker = address;
+      console.log(`Resolved ${broker} to ${resolvedBroker}`);
+      mainWindow.webContents.send("serial-data", `Resolved MQTT broker ${broker} to ${resolvedBroker}`);
+    }
+    return sendCommand(`SET_MQTT_BROKER:${resolvedBroker}`);
+  } catch (error) {
+    console.error(`Failed to resolve MQTT broker "${broker}":`, error);
+    return { error: `Failed to resolve MQTT broker: ${error.message}` };
+  }
+});
 ipcMain.handle("set-mqtt-user", (event, user) => sendCommand(`SET_MQTT_USER:${user}`));
 ipcMain.handle("set-mqtt-password", (event, pass) => sendCommand(`SET_MQTT_PASS:${pass}`));
-ipcMain.handle("set-mqtt-ssl", (event, enabled) => sendCommand(`SET_MQTT_SSL:${enabled}`));
+ipcMain.handle("set-mqtt-port", (event, portNum) => sendCommand(`SET_MQTT_PORT:${portNum}`));
 ipcMain.handle("set-mqtt-ca-cert", (event, path) => sendCommand(`SET_MQTT_CERT:${path}`));
 ipcMain.handle("set-mqtt-client-key", (event, path) => sendCommand(`SET_MQTT_KEY:${path}`));
-ipcMain.handle("get-mqtt-config", () => sendCommand("GET_MQTT_CONFIG"));
+ipcMain.handle("set-mqtt-ssl", (event, sslEnabled) => sendCommand(`SET_MQTT_SSL:${sslEnabled ? "ON" : "OFF"}`));
+
+// --- HTTP Config ---
 ipcMain.handle("set-http-url", (event, url) => sendCommand(`SET_HTTP_URL:${url}`));
 ipcMain.handle("set-http-auth", (event, auth) => sendCommand(`SET_HTTP_AUTH:${auth}`));
-ipcMain.handle("get-http-config", () => sendCommand("GET_HTTP_CONFIG"));
+
+// --- TCP Config ---
 ipcMain.handle("set-tcp-host", (event, host) => sendCommand(`SET_TCP_HOST:${host}`));
-ipcMain.handle("set-tcp-port", (event, port) => sendCommand(`SET_TCP_PORT:${port}`));
-ipcMain.handle("get-tcp-config", () => sendCommand("GET_TCP_CONFIG"));
+ipcMain.handle("set-tcp-port", (event, portNum) => sendCommand(`SET_TCP_PORT:${portNum}`));
+
+// --- Sensor Config ---
 ipcMain.handle("set-sensor-type", (event, type) => sendCommand(`SET_SENSOR_TYPE:${type}`));
 ipcMain.handle("set-sensor-format", (event, format) => sendCommand(`SET_SENSOR_FORMAT:${format}`));
-ipcMain.handle("get-sensor-config", () => sendCommand("GET_SENSOR_CONFIG"));
-ipcMain.handle("upload-file", (event, filename) => sendCommand(`UPLOAD:${filename}`));
 
-ipcMain.handle("open-file-dialog", async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties: ["openFile"]
-  });
-  return canceled ? null : filePaths[0];
+// --- File Upload ---
+ipcMain.handle("upload-file", async (event, filePath) => {
+  const fileName = path.basename(filePath);
+  return sendFile(filePath, fileName);
 });
 
+/**
+ * Upload MQTT certificates (cert + key) and configure them.
+ */
 ipcMain.handle("set-mqtt-certificates", async (event, { caCertPath, clientKeyPath }) => {
   if (!port || !port.isOpen) return { error: "Port not open!" };
+  const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-  const delay = ms => new Promise(res => setTimeout(res, ms));
   const certFileName = "device_cert.pem.crt";
   const keyFileName = "private_key.pem.key";
   const maxRetries = 3;
@@ -247,51 +307,18 @@ ipcMain.handle("set-mqtt-certificates", async (event, { caCertPath, clientKeyPat
   try {
     console.log("Starting certificate upload sequence...");
 
+    // Flush UART buffer
     while (port.readable && port.readableLength > 0) {
       port.read();
     }
     console.log("Flushed UART buffer before MKDIR");
 
+    // Ensure /usr/ directory exists
     console.log("Sending MKDIR:/usr/ to ensure directory exists");
     await sendCommand("MKDIR:/usr/");
+    await delay(1000);
 
-    const mkdirConfirmation = await new Promise((resolve, reject) => {
-      let responseData = "";
-      const timeout = setTimeout(() => {
-        cleanup();
-        resolve("No MKDIR response, proceeding");
-      }, 5000);
-
-      const dataListener = (data) => {
-        const text = data.toString("utf8");
-        responseData += text;
-        console.log(`Received during MKDIR confirmation: "${text}"`);
-        mainWindow.webContents.send("serial-data", text);
-
-        if (responseData.includes("Directory created") || responseData.includes("OK")) {
-          cleanup();
-          resolve("Directory created successfully");
-        } else if (responseData.includes("Error")) {
-          cleanup();
-          reject(new Error(`MKDIR failed: ${responseData.substring(0, 200)}`));
-        }
-      };
-
-      const cleanup = () => {
-        clearTimeout(timeout);
-        port.removeListener("data", dataListener);
-      };
-
-      port.on("data", dataListener);
-    });
-    console.log(mkdirConfirmation);
-    await delay(4000);
-
-    while (port.readable && port.readableLength > 0) {
-      port.read();
-    }
-    console.log("Flushed UART buffer before certificate upload");
-
+    // Upload certificate with retries
     let certResult;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -302,14 +329,16 @@ ipcMain.handle("set-mqtt-certificates", async (event, { caCertPath, clientKeyPat
       } catch (error) {
         console.error(`Attempt ${attempt} failed: ${error.message}`);
         if (attempt === maxRetries) throw error;
-        await delay(3000);
+        await delay(2000);
         while (port.readable && port.readableLength > 0) {
           port.read();
         }
       }
     }
-    await delay(3000);
 
+    await delay(2000);
+
+    // Upload private key with retries
     while (port.readable && port.readableLength > 0) {
       port.read();
     }
@@ -325,29 +354,141 @@ ipcMain.handle("set-mqtt-certificates", async (event, { caCertPath, clientKeyPat
       } catch (error) {
         console.error(`Attempt ${attempt} failed: ${error.message}`);
         if (attempt === maxRetries) throw error;
-        await delay(3000);
+        await delay(2000);
         while (port.readable && port.readableLength > 0) {
           port.read();
         }
       }
     }
-    await delay(3000);
 
-    await sendCommand(`SET_MQTT_CERT:/usr/${certFileName}`);
-    await delay(1000);
-    await sendCommand(`SET_MQTT_KEY:/usr/${keyFileName}`);
-    await delay(1000);
-    await sendCommand("SET_MQTT_SSL:ON");
-    await delay(1000);
-    await sendCommand("SET_MQTT_PORT:8883");
-    await delay(1000);
+    await delay(3000); // Longer delay for file system sync to avoid ENOENT
 
+    // Set certificate and key paths with retries to avoid ENOENT
+    let certSet = false;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Attempt ${attempt} to set MQTT certificate and key`);
+        await sendCommand(`SET_MQTT_CERT:/usr/${certFileName}`);
+        await delay(500);
+        await sendCommand(`SET_MQTT_KEY:/usr/${keyFileName}`);
+        await delay(500);
+
+        // Check for ENOENT error in response
+        const setResult = await new Promise((resolve, reject) => {
+          let responseData = "";
+          const timeout = setTimeout(() => {
+            cleanup();
+            resolve("No ENOENT detected");
+          }, 5000);
+
+          const dataListener = (data) => {
+            const text = data.toString("utf8");
+            responseData += text;
+            if (responseData.includes("ENOENT")) {
+              cleanup();
+              reject(new Error("File not found (ENOENT) during SET_MQTT_CERT/KEY"));
+            } else if (responseData.includes("saved OK")) {
+              cleanup();
+              resolve("Certificate and key set successfully");
+            }
+          };
+
+          const cleanup = () => {
+            clearTimeout(timeout);
+            port.removeListener("data", dataListener);
+          };
+
+          port.on("data", dataListener);
+        });
+
+        certSet = true;
+        break;
+      } catch (error) {
+        console.error(`Attempt ${attempt} to set certificate/key failed: ${error.message}`);
+        if (attempt === maxRetries) throw error;
+        await delay(1000);
+      }
+    }
+
+    if (!certSet) {
+      throw new Error("Failed to set MQTT certificate and key after retries");
+    }
+
+    // Set SSL and port with retries to ensure application
+    let sslApplied = false;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Attempt ${attempt} to set MQTT SSL and port`);
+        await sendCommand(`SET_MQTT_SSL:ON`);
+        await delay(1000); // Allow firmware to update config
+        await sendCommand(`SET_MQTT_PORT:8883`);
+        await delay(500);
+
+        // Verify with GET_MQTT_CONFIG
+        await sendCommand("GET_MQTT_CONFIG");
+        await delay(1000); // Wait for response
+
+        // Check for ssl=True in response
+        const configResult = await new Promise((resolve, reject) => {
+          let responseData = "";
+          const timeout = setTimeout(() => {
+            cleanup();
+            resolve("No confirmation, proceeding");
+          }, 5000);
+
+          const dataListener = (data) => {
+            const text = data.toString("utf8");
+            responseData += text;
+            if (responseData.includes("ssl=True") || responseData.includes("ssl_enabled: True")) {
+              cleanup();
+              resolve("SSL configuration applied");
+            } else if (responseData.includes("ssl=False") || responseData.includes("ssl_enabled: False")) {
+              cleanup();
+              reject(new Error("SSL configuration not applied"));
+            }
+          };
+
+          const cleanup = () => {
+            clearTimeout(timeout);
+            port.removeListener("data", dataListener);
+          };
+
+          port.on("data", dataListener);
+        });
+
+        sslApplied = true;
+        break;
+      } catch (error) {
+        console.error(`Attempt ${attempt} to set MQTT SSL failed: ${error.message}`);
+        if (attempt === maxRetries) throw new Error("Failed to apply MQTT SSL configuration");
+        await delay(1000);
+      }
+    }
+
+    if (!sslApplied) {
+      throw new Error("Failed to confirm SSL configuration after retries");
+    }
+
+    // Force MQTT reinitialization to apply new settings
+    await sendCommand("SET_PROTOCOL:MQTT");
+    await delay(2000); // Allow reinitialization
+
+    // Final verification
     await sendCommand("GET_MQTT_CONFIG");
-    await delay(1000);
 
-    return "Certificates uploaded and configured successfully.";
+    return "Certificates uploaded and MQTT configured successfully. SSL applied and client reinitialized.";
   } catch (error) {
-    console.error("Failed to upload certificates:", error);
-    return { error: `Failed to upload certificates: ${error.message}` };
+    console.error("Failed to upload certificates or configure MQTT:", error);
+    return { error: `Failed to upload certificates or configure MQTT: ${error.message}` };
   }
+});
+
+/**
+ * File dialog.
+ */
+ipcMain.handle("open-file-dialog", async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ["openFile"],
+  });
+  return canceled ? null : filePaths[0];
 });
