@@ -376,58 +376,68 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Replace the existing window.electronAPI.onSerialData handler with this:
 window.electronAPI.onSerialData((data) => {
-  if (data) {
-    const sanitizedData = data.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const outputDiv = document.getElementById("output");
-    let color = "black";
+  if (!data) return;
 
-    if (sanitizedData.includes("Error") || sanitizedData.includes("error") || sanitizedData.includes("failed") || sanitizedData.includes("ENOENT")) {
-      color = "red";
-    } else if (
-      sanitizedData.includes("Successfully") ||
-      sanitizedData.includes("saved OK") ||
-      sanitizedData.includes("Directory created") ||
-      sanitizedData.includes("Connected to") ||
-      sanitizedData.includes("SSL configuration applied")
-    ) {
-      color = "green";
-    } else if (sanitizedData.includes("/usr contents") || sanitizedData.includes("LIST_FILES")) {
-      color = "blue";
-    } else if (sanitizedData.includes("MQTT connect OK")) {
-      color = "green";
-    } else if (sanitizedData.includes("MQTT Connect error")) {
-      color = "red";
-    }
+  // 1) Remove common ANSI / control sequences (VT100)
+  const stripAnsi = (s) => {
+    // remove CSI sequences like \x1b[31m and other control chars except CR/LF
+    s = s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+    // remove other C0 control characters except newline/carriage return
+    s = s.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '');
+    return s;
+  };
 
-    outputDiv.innerHTML += `<span style="color: ${color};">${sanitizedData}</span><br>`;
+  let text = stripAnsi(String(data));
 
-    if (sanitizedData.startsWith("FTP protocol")) {
-      const hostMatch = sanitizedData.match(/host=([^,]+)/);
-      const userMatch = sanitizedData.match(/user=([^,]+)/);
-      if (hostMatch) document.getElementById("ftp-host").value = hostMatch[1];
-      if (userMatch) document.getElementById("ftp-user").value = userMatch[1];
-    }
+  // 2) Sanitize < and >
+  text = text.replace(/</g, '&lt;'); // only escape "<", keep ">" visible
 
-    if (sanitizedData.startsWith("MQTT protocol") || sanitizedData.includes("MQTT extras")) {
-      const brokerMatch = sanitizedData.match(/broker=([^,]+)/);
-      const userMatch = sanitizedData.match(/user=([^,]+)/);
-      const sslMatch = sanitizedData.match(/ssl=([^,]+)/) || sanitizedData.match(/ssl_enabled=([^,]+)/);
-      if (brokerMatch) document.getElementById("mqtt-broker").value = brokerMatch[1];
-      if (userMatch) document.getElementById("mqtt-user").value = userMatch[1];
-      if (sslMatch) {
-        const sslValue = sslMatch[1].toLowerCase();
-        document.getElementById("mqtt-ssl").value = sslValue === "true" || sslValue === "on" ? "yes" : "no";
-      }
-    }
 
-    if (sanitizedData.startsWith("HTTP protocol")) {
-      const urlMatch = sanitizedData.match(/url=([^,]+)/);
-      if (urlMatch) document.getElementById("http-url").value = urlMatch[1];
-    }
+  // 3) Normalize whitespace (trim trailing CR/LF)
+  text = text.replace(/\r?\n$/, '');
 
-    outputDiv.scrollTop = outputDiv.scrollHeight;
+  const outputDiv = document.getElementById('output');
+  if (!outputDiv) return;
+
+  // 4) Dedupe adjacent identical lines (prevents echo duplicates)
+  const lastEl = outputDiv.lastElementChild;
+  if (lastEl && lastEl.textContent === text) {
+    // Already present as last line — skip appending
+    return;
   }
+
+  // 5) Create element and add semantic classes
+  const lineEl = document.createElement('div');
+  lineEl.className = 'log-line';
+
+  const low = text.toLowerCase();
+  if (low.includes('error') || low.includes('failed') || low.includes('enoent')) {
+    lineEl.classList.add('log-error');
+  } else if (
+    low.includes('successfully') ||
+    low.includes('saved ok') ||
+    low.includes('directory created') ||
+    low.includes('connected to') ||
+    low.includes('sent') ||
+    low.includes('ok')
+  ) {
+    lineEl.classList.add('log-success');
+  } else if (text.startsWith('>')) {
+    lineEl.classList.add('log-cmd'); // command echo
+  } else if (low.includes('mqtt') && low.includes('connect')) {
+    lineEl.classList.add('log-info');
+  } else {
+    lineEl.classList.add('log-default');
+  }
+
+  // Use textContent to preserve raw characters and spacing
+  lineEl.textContent = text;
+
+  // 6) Append and scroll
+  outputDiv.appendChild(lineEl);
+  outputDiv.scrollTop = outputDiv.scrollHeight;
 });
 
 window.addEventListener("DOMContentLoaded", () => {
