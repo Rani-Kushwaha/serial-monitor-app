@@ -151,6 +151,39 @@ async function sendCommand(cmd) {
   document.getElementById("output").innerHTML += result + "<br>";
 }
 
+async function setDeviceID() {
+  const deviceID = document.getElementById("device-id").value.trim();
+  if (!deviceID) {
+    document.getElementById("output").innerHTML += `<span style="color: red;">Please enter a valid Device ID.</span><br>`;
+    return;
+  }
+
+  // Basic validation: ensure Device ID is alphanumeric with optional hyphens/underscores
+  if (!/^[a-zA-Z0-9-_]+$/.test(deviceID)) {
+    document.getElementById("output").innerHTML += `<span style="color: red;">Device ID must be alphanumeric with optional hyphens or underscores.</span><br>`;
+    return;
+  }
+
+  const result = await window.electronAPI.setDeviceID(deviceID);
+  if (result.error) {
+    document.getElementById("output").innerHTML += `<span style="color: red;">${result.error}</span><br>`;
+    return;
+  }
+
+  document.getElementById("output").innerHTML += `<span style="color: green;">${result}</span><br>`;
+  await delay(500);
+  await window.electronAPI.getDeviceID(); // Verify setting
+}
+
+async function getDeviceID() {
+  const result = await window.electronAPI.getDeviceID();
+  if (result.error) {
+    document.getElementById("output").innerHTML += `<span style="color: red;">${result.error}</span><br>`;
+  } else {
+    document.getElementById("output").innerHTML += result + "<br>";
+  }
+}
+
 async function setInterval() {
   const interval = document.getElementById("interval").value;
 
@@ -166,8 +199,8 @@ async function setInterval() {
   }
 
   document.getElementById("output").innerHTML += result + "<br>";
-  await delay(500); // Wait for firmware to save
-  await window.electronAPI.getInterval(); // Confirm setting
+  await delay(500);
+  await window.electronAPI.getInterval();
 }
 
 async function getInterval() {
@@ -219,7 +252,7 @@ async function setFTPConfig() {
   }
 
   await delay(500);
-  await window.electronAPI.getFTPConfig(); // Verify settings
+  await window.electronAPI.getFTPConfig();
 }
 
 async function getFTPConfig() {
@@ -243,10 +276,9 @@ async function setMQTTConfig() {
     return;
   }
 
-  // Send SSL first to ensure correct port alignment
   if (sslEnabled !== "") {
     await window.electronAPI.setMQTTSSL(sslEnabled === "yes");
-    await delay(1000); // Allow firmware to update and reinitialize
+    await delay(1000);
   }
   if (port && !isNaN(port) && port > 0) {
     await window.electronAPI.setMQTTPort(port);
@@ -265,13 +297,12 @@ async function setMQTTConfig() {
     await delay(500);
   }
 
-  // Force reinitialization to apply settings
   await window.electronAPI.setProtocol("MQTT");
-  await delay(2000); // Allow firmware to reinitialize MQTTClient
+  await delay(2000);
 
   document.getElementById("output").innerHTML += `<span style="color: green;">MQTT config sent and reinitialized. Verifying...</span><br>`;
   await delay(1000);
-  await window.electronAPI.getMQTTConfig(); // Verify settings
+  await window.electronAPI.getMQTTConfig();
 }
 
 async function getMQTTConfig() {
@@ -307,7 +338,7 @@ async function setHTTPConfig() {
   }
 
   await delay(500);
-  await window.electronAPI.getHTTPConfig(); // Verify settings
+  await window.electronAPI.getHTTPConfig();
 }
 
 async function getHTTPConfig() {
@@ -330,7 +361,7 @@ async function setSensorType() {
   }
 
   await delay(500);
-  await window.electronAPI.getSensorConfig(); // Verify settings
+  await window.electronAPI.getSensorConfig();
 }
 
 async function setSensorFormat() {
@@ -344,7 +375,7 @@ async function setSensorFormat() {
   }
 
   await delay(500);
-  await window.electronAPI.getSensorConfig(); // Verify settings
+  await window.electronAPI.getSensorConfig();
 }
 
 async function getSensorConfig() {
@@ -376,7 +407,6 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Replace the existing window.electronAPI.onSerialData handler with this:
 window.electronAPI.onSerialData((data) => {
   if (!data) return;
 
