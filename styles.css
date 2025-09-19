@@ -148,20 +148,49 @@ h2 {
   font-weight: 600;
 }
 
+/* Headings */
+h2 {
+  font-size: 1.8em;
+  margin-bottom: 18px;
+  text-align: center;
+  font-weight: 600;
+  position: relative;
+  padding: 8px 0;
+}
+
 body.light-mode h2 {
-  background: linear-gradient(90deg, #4b6cb7, #6b8af7);
+  background: linear-gradient(90deg, #4b6cb7, #6b8af7, #a3bffa);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 2px 4px rgba(75, 108, 183, 0.3);
+  background-clip: text;
 }
 
 body.dark-mode h2 {
-  background: linear-gradient(90deg, #2a4370, #6b8af7);
+  background: linear-gradient(90deg, #2a4370, #6b8af7, #a3bffa);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 2px 6px rgba(42, 67, 112, 0.5);
+  background-clip: text;
 }
 
+/* Add a pseudo-element for the ">" prefix with a distinct style */
+/* h2:before {
+  content: ">";
+  font-weight: 700;
+  margin-right: 8px;
+  color: #ff6b6b; 
+  text-shadow: 0 1px 3px rgba(255, 107, 107, 0.4);
+  transition: color 0.3s ease;
+}
+
+body.dark-mode h2:before {
+  color: #ff8787;
+}
+
+body.light-mode h2:before {
+  color: #e63946; 
+} */
 h3 {
   font-size: 1.1em;
   margin-bottom: 12px;
